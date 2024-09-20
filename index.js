@@ -1,0 +1,124 @@
+const { faker } = require('@faker-js/faker');
+const mysql = require('mysql2');
+const express = require("express");
+const app = express();
+const path = require("path");
+const methodOverride = require("method-override");
+
+const port = 8080;
+
+app.use(methodOverride("_method"));
+app.use(express.urlencoded({ extended: true })); //to parse the data sent by patch request inside url
+app.set("view engine", "ejs");
+app.set("views", path.join(__dirname, "/views"));
+
+const connection = mysql.createConnection({
+    host: 'localhost',
+    user: 'root',
+    database: 'delta_app',
+    password: 'root',
+});
+
+// let getRandomUser = () => {  //this will return array
+//     return [
+//        faker.string.uuid(),
+//        faker.internet.userName(),
+//        faker.internet.email(),
+//        faker.internet.password(),
+//     ];
+// };
+
+//home page
+app.get("/", (req, res) => {
+    let q = "select count(*) from user";  // this command will return total number of users from query table
+    try {
+        connection.query(q, (err, result) => {
+            if (err) {
+                console.error('Error executing query:', err);
+                return;
+            }
+            // console.log(result[0]["count(*)"]);  // result[0].key would also work
+            let count = result[0]["count(*)"];
+            // res.send("success");
+            res.render("home.ejs", { count });
+        });
+    } catch (error) {
+        console.error('Unexpected error:', error);
+        res.status(500).send('An unexpected error occurred');
+    }
+});
+
+// show page/route
+app.get("/user", (req, res) => {
+    let q = "SELECT * FROM user";
+    try {
+        connection.query(q, (err, users) => {
+            if (err) throw err;
+            // console.log(result);
+            // res.render('user', { user: result });   //this will render user.ejs file 
+            res.render("showusers.ejs", { users });
+        });
+    } catch (error) {
+        console.log(error);
+        res.send("some error in DB");
+    }
+});
+
+//edit route
+app.get("/user/:id/edit", (req, res) => {
+    let { id } = req.params;
+    // console.log(id);
+    let q = `select * from user where id='${id}'`;  //it is necessary to put id in single inverted commas to pass its value as a string
+    // res.render("edit.ejs");
+    try {
+        connection.query(q, (err, result) => {
+            if (err) throw err;
+            // console.log(result);
+            let user = result[0];
+            res.render("edit.ejs", { user });  //since we passed user to res.render, edit.ejs could also use that information
+            // res.render('user', { user: result });   //this will render user.ejs file 
+        });
+    } catch (error) {
+        console.log(error);
+        res.send("some error in DB");
+    }
+});
+
+//update route
+app.patch("/user/:id", (req, res) => {
+    let { id } = req.params;
+    let { password: formPass, username: newUsername } = req.body;
+    let q = `SELECT * FROM user WHERE id = ${id}`;
+
+    try {
+        connection.query(q, (err, result) => {
+            if (err) throw err;
+            let user = result[0];
+            if (formPass !== user.password) {
+                res.send("wrong pass");
+            } else {
+                let q2 = `UPDATE user SET username = '${newUsername}' WHERE id = '${id}'`;
+                connection.query(q2, (err, result) => {
+                    if (err) throw err;
+                    res.redirect("/user");
+                });
+            }
+        });
+    } catch (err) {
+        console.log(err);
+        res.send("Some error in DB");
+    }
+});
+
+app.listen("8080", () => {
+    console.log("server is listening to port 8080");
+});
+
+// let getRandomUser = () => {  //this will return object
+//     return {
+//       id: faker.string.uuid(),
+//       username: faker.internet.userName(),
+//       email: faker.internet.email(),
+//       password: faker.internet.password(),
+//     };
+// };
